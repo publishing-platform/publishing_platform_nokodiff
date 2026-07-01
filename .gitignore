@@ -1,0 +1,25 @@
+/.bundle/
+/.yardoc
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+/spec/dummy/tmp/
+/spec/dummy/log/
+/spec/dummy/db/
+/spec/dummy/public/
+/spec/dummy/tasks/
+/spec/dummy/scripts/
+/spec/dummy/storage/
+/spec/dummy/.kamal/hooks/
+spec/dummy/.byebug_history
+
+# rspec failure tracking
+.rspec_status
+.byebug_history
+
+Gemfile.lock
+/.idea
+/spec/dummy/app/assets/builds/application.css

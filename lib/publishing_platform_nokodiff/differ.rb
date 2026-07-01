@@ -1,0 +1,198 @@
+module PublishingPlatformNokodiff
+  class Differ
+    def initialize(before, after)
+      @before = before
+      @after = after
+    end
+
+    def to_html
+      compared_blocks.map { |diff|
+        case diff[:status]
+        when :unchanged
+          unchanged_block(diff[:before])
+        when :changed
+          changed_block(diff[:before], diff[:after])
+        when :deleted
+          diff[:before].name == "li" ? deleted_li(diff[:before]) : deleted_block(diff[:before])
+        when :added
+          diff[:after].name == "li" ? added_li(diff[:after]) : added_block(diff[:after])
+        end
+      }.join("\n")
+    end
+
+  private
+
+    def compared_blocks
+      before_nodes = @before.children.to_a
+      after_nodes = @after.children.to_a
+
+      before_html_strings = before_nodes.map { |n| n.to_html.strip }
+      after_html_strings  = after_nodes.map { |n| n.to_html.strip }
+
+      Diff::LCS.sdiff(before_html_strings, after_html_strings).map do |change|
+        case change.action
+        when "="
+          {
+            status: :unchanged,
+            before: before_nodes[change.old_position],
+            after: after_nodes[change.new_position],
+          }
+        when "!"
+          {
+            status: :changed,
+            before: before_nodes[change.old_position],
+            after: after_nodes[change.new_position],
+          }
+        when "-"
+          {
+            status: :deleted,
+            before: before_nodes[change.old_position],
+            after: nil,
+          }
+        when "+"
+          {
+            status: :added,
+            before: nil,
+            after: after_nodes[change.new_position],
+          }
+        end
+      end
+    end
+
+    def changed_block(before_node, after_node)
+      if structurally_similar?(before_node, after_node) && should_not_be_treated_as_single_change?(before_node)
+        inner_diff = Differ.new(before_node, after_node).to_html
+        rebuild_element(after_node, inner_diff)
+      else
+        before_diff, after_diff = if both_text_nodes?(before_node, after_node)
+                                    diff_raw_text(before_node, after_node)
+                                  else
+                                    diff_sub_elements(before_node, after_node)
+                                  end
+
+        if before_node.name == "li"
+          deleted_li(before_diff) + added_li(after_diff)
+        else
+          deleted_block(before_diff) + added_block(after_diff)
+        end
+      end
+    end
+
+    def both_text_nodes?(before_node, after_node)
+      before_node.text? && after_node.text?
+    end
+
+    def structurally_similar?(before_node, after_node)
+      before_node.element? &&
+        after_node.element? &&
+        before_node.name == after_node.name
+    end
+
+    # We want all changes within a paragraph, heading, or list item to be treated as a single change, even if they are
+    # structurally different, to avoid overwhelming the user with changes, and ensure any nested elements are included
+    # within the diff, rather than being treated as added or removed content on their own.
+    def should_not_be_treated_as_single_change?(before_node)
+      before_node.name != "p" &&
+        !before_node.name.match(/^h[1-6]$/) &&
+        before_node.name != "li"
+    end
+
+    def rebuild_element(template_node, inner_html)
+      result = template_node.dup
+      result.inner_html = inner_html
+      result.to_html
+    end
+
+    def diff_raw_text(before_text, after_text)
+      diff = Diff::LCS.sdiff(before_text.text.chars, after_text.text.chars)
+      before_fragment, after_fragment = PublishingPlatformNokodiff::ChangesInFragments.new(diff).call
+      [merge_fragment_spans(before_fragment), merge_fragment_spans(after_fragment)]
+    end
+
+    def merge_fragment_spans(fragment)
+      doc = fragment.document
+      wrapper = Nokogiri::XML::Node.new("span", doc)
+      wrapper.inner_html = fragment.to_html
+      merge_adjacent_highlighted_changes(wrapper)
+      wrapper.inner_html
+    end
+
+    def diff_sub_elements(before_html, after_html)
+      before_dup = before_html.dup
+      after_dup = after_html.dup
+
+      before_fragment, after_fragment = PublishingPlatformNokodiff::TextNodeDiffs.new(before_dup, after_dup).call
+
+      merge_adjacent_highlighted_changes(before_fragment)
+      merge_adjacent_highlighted_changes(after_fragment)
+
+      if before_html.name == "li"
+        [before_fragment.inner_html, after_fragment.inner_html]
+      else
+        [before_fragment.to_html, after_fragment.to_html]
+      end
+    end
+
+    def merge_adjacent_highlighted_changes(node)
+      return unless node.element?
+
+      node.children.each do |child|
+        merge_adjacent_highlighted_changes(child) if child.element?
+      end
+
+      node.children.each_cons(2) do |left, right|
+        next unless node_is_a_change?(left) && node_is_a_change?(right)
+
+        left.content = left.content + right.content
+        right.remove
+
+        merge_adjacent_highlighted_changes(node)
+        break
+      end
+    end
+
+    def node_is_a_change?(node)
+      node.name == "span" && node["class"] == "diff-marker"
+    end
+
+    def unchanged_block(node)
+      node.to_html
+    end
+
+    def deleted_li(html)
+      %(
+        <li>
+          <div class="diff">
+            <del aria-label="removed content">#{html}</del>
+          </div>
+        </li>
+      )
+    end
+
+    def deleted_block(html)
+      %(
+        <div class="diff">
+           <del aria-label="removed content">#{html}</del>
+        </div>
+      )
+    end
+
+    def added_block(html)
+      %(
+        <div class="diff">
+           <ins aria-label="added content">#{html}</ins>
+        </div>
+      )
+    end
+
+    def added_li(html)
+      %(
+        <li>
+          <div class="diff">
+            <ins aria-label="added content">#{html}</ins>
+          </div>
+        </li>
+      )
+    end
+  end
+end

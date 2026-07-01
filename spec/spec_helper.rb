@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+require "simplecov"
+SimpleCov.start do
+  minimum_coverage 100
+  add_filter "lib/publishing_platform_nokodiff/engine.rb"
+end
+
+require "publishing_platform_nokodiff"
+require "active_support/core_ext/string/output_safety"
+require "active_support/core_ext/string"
+require "rspec-html-matchers"
+
+Dir[File.join(File.dirname(__FILE__), "support", "**", "*.rb")].sort.each { |f| require f }
+
+RSpec.configure do |config|
+  # Enable flags like --only-failures and --next-failure
+  config.example_status_persistence_file_path = ".rspec_status"
+
+  # Disable RSpec exposing methods globally on `Module` and `main`
+  config.disable_monkey_patching!
+
+  config.expect_with :rspec do |c|
+    c.syntax = :expect
+  end
+
+  config.include RSpecHtmlMatchers
+end

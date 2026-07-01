@@ -1,0 +1,72 @@
+// stylelint-disable selector-no-qualifying-type, max-nesting-depth
+// Diff of two editions
+$added-color: #e6fff3;
+$diff-marker-added-color: #99ffcf;
+$removed-color: #fadede;
+$diff-marker-removed-color: #f3aeac;
+$text-colour: #0b0c0c;
+$light-grey: #f3f2f1;
+$black: #0b0c0c;
+
+.compare-editions {
+  position: relative;
+  border-left: 40px solid $light-grey;
+  padding: 15px;
+
+  .diff {
+    position: static;
+    margin-bottom: 10px;
+
+    del, ins {
+      position: static !important;
+      display: block;
+      text-decoration: none;
+      border-radius: 3px;
+    }
+
+    del {
+      background-color: $removed-color;
+      padding-bottom: 2px;
+
+      span.diff-marker {
+        font-weight: normal;
+        background-color: $diff-marker-removed-color;
+        border-bottom: 2px dashed $black;
+      }
+    }
+
+    ins {
+      background-color: $added-color;
+      padding-bottom: 2px;
+
+      span.diff-marker {
+        font-weight: normal;
+        background-color: $diff-marker-added-color;
+        border-bottom: 2px dashed $black;
+      }
+    }
+
+    del::before,
+    ins::before {
+      position: absolute;
+      left: -40px;
+      width: 40px;
+      height: 1.5em;
+      line-height: 1.5em;
+      text-align: center;
+      z-index: 10;
+    }
+  }
+
+  del::before {
+    color: $text-colour;
+    background-color: $diff-marker-removed-color;
+    content: "−";
+  }
+
+  ins::before {
+    color: $text-colour;
+    background-color: $diff-marker-added-color;
+    content: "+";
+  }
+}
